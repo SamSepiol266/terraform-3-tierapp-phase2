@@ -48,3 +48,9 @@ jobs:
       # 6. Plan (The dry run)
       - name: Terraform Plan
         run: terraform plan -input=false
+
+      # 7. Apply (Build infrastructure)	
+      - name: Terraform Apply
+        # Only run this on the main branch, not on pull requests
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: terraform apply -auto-approve -input=false	
