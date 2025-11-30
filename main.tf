@@ -41,10 +41,10 @@ module "app_tier" {
 }
 
 module "database_tier" {
-  source                 = "./modules/database_tier"
-  db_sg_id               = module.security_groups.db_sg_id
-  db_subnet_group_name   = module.vpc.db_subnet_group_name
-  db_password            = "YourSecurePassword123" # Change this!
+  source               = "./modules/database_tier"
+  db_sg_id             = module.security_groups.db_sg_id
+  db_subnet_group_name = module.vpc.db_subnet_group_name
+  db_password          = "YourSecurePassword123" # Change this!
 }
 
 # Add this to your root configuration
@@ -53,7 +53,7 @@ terraform {
   backend "s3" {
     bucket         = "my-3-tier-app-tfstate" # The S3 bucket you created
     key            = "global/terraform.tfstate"
-    region         = "us-east-1"
+    region         = "us-west-1"
     dynamodb_table = "terraform-state-lock"
   }
 }

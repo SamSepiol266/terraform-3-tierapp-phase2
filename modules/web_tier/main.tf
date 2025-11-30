@@ -8,9 +8,9 @@ data "aws_ami" "amazon_linux_2" {
 }
 
 resource "aws_launch_template" "web" {
-  name_prefix   = "web-tier-"
-  image_id      = data.aws_ami.amazon_linux_2.id
-  instance_type = "t2.micro"
+  name_prefix            = "web-tier-"
+  image_id               = data.aws_ami.amazon_linux_2.id
+  instance_type          = "t2.micro"
   vpc_security_group_ids = [var.web_sg_id]
   user_data = base64encode(<<-EOF
               #!/bin/bash
