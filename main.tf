@@ -53,7 +53,7 @@ terraform {
   backend "s3" {
     bucket         = "my-3-tier-app-tfstate" # The S3 bucket you created
     key            = "global/terraform.tfstate"
-    region         = "us-west-1"
+    region         = "us-east-1"
     dynamodb_table = "terraform-state-lock"
   }
 }
