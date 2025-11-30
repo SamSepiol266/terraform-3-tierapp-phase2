@@ -16,6 +16,16 @@ jobs:
         uses: actions/checkout@v3
 
       # 2. Log in to AWS (The FIX)
+      - name: Debug Secrets
+        run: |
+          if [ -z "${{ secrets.AWS_ACCESS_KEY_ID }}" ]; then
+            echo "ERROR: AWS_ACCESS_KEY_ID is EMPTY"
+          else
+            echo "SUCCESS: AWS_ACCESS_KEY_ID is set (First 4 chars: ${key:0:4}...)"
+          fi
+        env:
+          key: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
