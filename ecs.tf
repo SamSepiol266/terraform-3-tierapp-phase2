@@ -10,8 +10,8 @@ resource "aws_iam_role" "ecs_execution_role" {
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
-      Action = "sts:AssumeRole"
-      Effect = "Allow"
+      Action    = "sts:AssumeRole"
+      Effect    = "Allow"
       Principal = { Service = "ecs-tasks.amazonaws.com" }
     }]
   })
@@ -28,7 +28,7 @@ resource "aws_security_group" "lb_sg" {
   name        = "load-balancer-sg"
   description = "Allow port 80"
   # CHECK THIS REFERENCE: Must match your VPC resource name
-  vpc_id      = module.vpc.vpc_id
+  vpc_id = module.vpc.vpc_id
 
   ingress {
     from_port   = 80
@@ -50,7 +50,7 @@ resource "aws_security_group" "ecs_tasks_sg" {
   name        = "ecs-tasks-sg"
   description = "Allow traffic from ALB"
   # CHECK THIS REFERENCE
-  vpc_id      = module.vpc.vpc_id
+  vpc_id = module.vpc.vpc_id
 
   ingress {
     from_port       = 80
@@ -74,7 +74,7 @@ resource "aws_lb" "main" {
   load_balancer_type = "application"
   security_groups    = [aws_security_group.lb_sg.id]
   # CHECK THIS REFERENCE: Must match your public subnets
-  subnets            = module.vpc.public_subnet_ids
+  subnets = module.vpc.public_subnet_ids
 }
 
 resource "aws_lb_target_group" "app_tg" {
@@ -83,7 +83,7 @@ resource "aws_lb_target_group" "app_tg" {
   protocol    = "HTTP"
   target_type = "ip"
   # CHECK THIS REFERENCE
-  vpc_id      = module.vpc.vpc_id
+  vpc_id = module.vpc.vpc_id
 
   health_check {
     path = "/"
@@ -111,7 +111,7 @@ resource "aws_ecs_task_definition" "app" {
   execution_role_arn       = aws_iam_role.ecs_execution_role.arn
 
   container_definitions = jsonencode([{
-    name      = "my-app-container"
+    name = "my-app-container"
     # Requires ecr.tf to exist
     image     = "${aws_ecr_repository.app_repo.repository_url}:latest"
     essential = true
