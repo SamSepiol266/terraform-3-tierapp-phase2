@@ -80,7 +80,7 @@ resource "aws_lb_target_group" "app_tg" {
   protocol    = "HTTP"
   target_type = "ip"
   vpc_id      = aws_vpc.main.id # <--- CHECK THIS REFERENCE
-  
+
   health_check {
     path = "/"
   }
