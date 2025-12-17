@@ -3,7 +3,7 @@ resource "aws_ecs_cluster" "main" {
   name = "my-3-tier-app-cluster"
 
   tags = {
-    Environment = "Test-GitOps"
+    Environment = "Test2-GitOps"
   }
 }
 
