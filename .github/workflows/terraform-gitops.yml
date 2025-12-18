@@ -7,9 +7,9 @@ on:
     branches: [ "main" ]
 
 permissions:
-  id-token: write
-  contents: read
-  pull-requests: write
+  id-token: write       # Required for OIDC
+  contents: read        # Required to checkout code
+  pull-requests: write  # Required to comment on PRs
 
 env:
   AWS_REGION: us-west-1
@@ -24,9 +24,11 @@ jobs:
         shell: bash
 
     steps:
+      # 1. Checkout Code
       - name: Checkout Code
         uses: actions/checkout@v3
 
+      # 2. Configure AWS Credentials (OIDC)
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -34,17 +36,23 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
+      # 3. Setup Terraform
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v2
         with:
           terraform_version: ${{ env.TF_VERSION }}
 
+      # 4. Terraform Format Check
+      # Fails if your code isn't perfectly formatted
       - name: Terraform Format
         run: terraform fmt -check
 
+      # 5. Terraform Init
       - name: Terraform Init
         run: terraform init
 
+      # 6. Terraform Validate
+      # Checks for syntax errors
       - name: Terraform Validate
         run: terraform validate
 
@@ -59,12 +67,16 @@ jobs:
           soft_fail: true 
           framework: terraform
 
+      # 7. Terraform Plan (Runs ONLY on Pull Requests)
       - name: Terraform Plan
         if: github.event_name == 'pull_request'
         id: plan
+        # Generates a plan and saves it to a file, but doesn't apply it
         run: terraform plan -no-color -input=false
-        continue-on-error: true
+        continue-on-error: true # Let the workflow continue so we can comment the error if it fails
 
+      # 8. Post Plan to GitHub PR (GitOps Magic)
+      # This puts the plan results into the PR conversation
       - name: Update Pull Request
         uses: actions/github-script@v6
         if: github.event_name == 'pull_request'
@@ -95,10 +107,12 @@ jobs:
               body: output
             })
 
+      # 9. Stop if Plan Failed
       - name: Terraform Plan Status
         if: steps.plan.outcome == 'failure'
         run: exit 1
 
+      # 10. Terraform Apply (Runs ONLY on Push to Main)
       - name: Terraform Apply
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: terraform apply -auto-approve -input=false
