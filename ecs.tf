@@ -1,21 +1,16 @@
 # --- 1. ECS Cluster ---
 resource "aws_ecs_cluster" "main" {
   name = "my-3-tier-app-cluster"
-
-  tags = {
-    Environment = "Test2-GitOps"
-  }
 }
 
 # --- 2. IAM Roles (Permissions) ---
-# Role for the ECS Agent (to pull images from ECR and send logs)
 resource "aws_iam_role" "ecs_execution_role" {
   name = "ecs_execution_role"
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
-      Action    = "sts:AssumeRole"
-      Effect    = "Allow"
+      Action = "sts:AssumeRole"
+      Effect = "Allow"
       Principal = { Service = "ecs-tasks.amazonaws.com" }
     }]
   })
@@ -27,12 +22,10 @@ resource "aws_iam_role_policy_attachment" "ecs_execution_role_policy" {
 }
 
 # --- 3. Security Groups ---
-# ALB Security Group: Allow traffic from the world on port 80
 resource "aws_security_group" "lb_sg" {
   name        = "load-balancer-sg"
   description = "Allow port 80"
-  # CHECK THIS REFERENCE: Must match your VPC resource name
-  vpc_id = module.vpc.vpc_id
+  vpc_id      = module.vpc.vpc_id
 
   ingress {
     from_port   = 80
@@ -49,12 +42,10 @@ resource "aws_security_group" "lb_sg" {
   }
 }
 
-# ECS Task Security Group: Allow traffic ONLY from the ALB
 resource "aws_security_group" "ecs_tasks_sg" {
   name        = "ecs-tasks-sg"
   description = "Allow traffic from ALB"
-  # CHECK THIS REFERENCE
-  vpc_id = module.vpc.vpc_id
+  vpc_id      = module.vpc.vpc_id
 
   ingress {
     from_port       = 80
@@ -77,8 +68,7 @@ resource "aws_lb" "main" {
   internal           = false
   load_balancer_type = "application"
   security_groups    = [aws_security_group.lb_sg.id]
-  # CHECK THIS REFERENCE: Must match your public subnets
-  subnets = module.vpc.public_subnet_ids
+  subnets            = module.vpc.public_subnet_ids
 }
 
 resource "aws_lb_target_group" "app_tg" {
@@ -86,8 +76,7 @@ resource "aws_lb_target_group" "app_tg" {
   port        = 80
   protocol    = "HTTP"
   target_type = "ip"
-  # CHECK THIS REFERENCE
-  vpc_id = module.vpc.vpc_id
+  vpc_id      = module.vpc.vpc_id
 
   health_check {
     path = "/"
@@ -115,14 +104,20 @@ resource "aws_ecs_task_definition" "app" {
   execution_role_arn       = aws_iam_role.ecs_execution_role.arn
 
   container_definitions = jsonencode([{
-    name = "my-app-container"
-    # Requires ecr.tf to exist
+    name      = "my-app-container"
     image     = "${aws_ecr_repository.app_repo.repository_url}:latest"
     essential = true
     portMappings = [{
       containerPort = 80
       hostPort      = 80
     }]
+    # --- ENVIRONMENT VARIABLES (Connecting to DB) ---
+    environment = [
+      { name = "DB_HOST", value = split(":", module.database_tier.db_instance_endpoint)[0] },
+      { name = "DB_NAME", value = "mydb" }, # Update if you named your DB differently
+      { name = "DB_USER", value = "admin" }, # Default for RDS usually
+      { name = "DB_PASSWORD", value = "YourSecurePassword123" } # Matching your main.tf
+    ]
   }])
 }
 
@@ -135,7 +130,6 @@ resource "aws_ecs_service" "main" {
   launch_type     = "FARGATE"
 
   network_configuration {
-    # Using public subnets for simpler demo connectivity
     subnets          = module.vpc.public_subnet_ids
     security_groups  = [aws_security_group.ecs_tasks_sg.id]
     assign_public_ip = true
