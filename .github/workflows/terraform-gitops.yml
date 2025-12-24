@@ -1,6 +1,11 @@
 name: Terraform GitOps
 
-on: push: branches: [ "main" ] pull_request: branches: [ "main" ] workflow_dispatch:
+on: 
+  push: 
+    branches: [ "main" ] 
+  pull_request: 
+    branches: [ "main" ] 
+  workflow_dispatch:
 
 permissions: id-token: write # Required for OIDC contents: read # Required to checkout code pull-requests: write # Required to comment on PRs
 
