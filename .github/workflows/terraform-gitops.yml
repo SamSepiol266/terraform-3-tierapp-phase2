@@ -1,120 +1,119 @@
 name: Terraform GitOps
 
-on: 
-  push: 
-    branches: [ "main" ] 
-  pull_request: 
-    branches: [ "main" ] 
-  workflow_dispatch:
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch: # Allows manual triggering from the Actions tab
 
-permissions: 
-  id-token: write # Required for OIDC 
-  contents: read # Required to checkout code 
-  pull-requests: write # Required to comment on PRs
+permissions:
+  id-token: write       # Required for OIDC
+  contents: read        # Required to checkout code
+  pull-requests: write  # Required to comment on PRs
 
-env: AWS_REGION: us-west-1 TF_VERSION: 1.5.0
+env:
+  AWS_REGION: us-west-1
+  TF_VERSION: 1.5.0
 
-jobs: terraform: name: "Terraform" runs-on: ubuntu-latest defaults: run: shell: bash
+jobs:
+  terraform:
+    name: "Terraform"
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
 
-Code
-steps:
-  # 1. Checkout Code
-  - name: Checkout Code
-    uses: actions/checkout@v3
+    steps:
+      # 1. Checkout Code
+      - name: Checkout Code
+        uses: actions/checkout@v3
 
-  # 2. Configure AWS Credentials (OIDC) — prefer OIDC role assumption over long-lived secrets
-  - name: Configure AWS Credentials
-    uses: aws-actions/configure-aws-credentials@v4
-    with:
-      # OIDC: reference the role ARN stored in repo/org secrets
-      role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-      aws-region: ${{ env.AWS_REGION }}
+      # 2. Configure AWS Credentials (OIDC)
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          # OIDC: We reference the SECRET NAME, not the ARN directly
+          role-to-assume: "${{ secrets.AWS_ROLE_ARN }}"
+          aws-region: ${{ env.AWS_REGION }}
 
-  # 3. Setup Terraform
-  - name: Setup Terraform
-    uses: hashicorp/setup-terraform@v2
-    with:
-      terraform_version: ${{ env.TF_VERSION }}
+      # 3. Setup Terraform
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
 
-  # 4. Terraform Format Check
-  # Fails if your code isn't perfectly formatted
-  - name: Terraform Format
-    id: fmt
-    run: terraform fmt -check
+      # 4. Terraform Format Check
+      # Fails if your code isn't perfectly formatted
+      - name: Terraform Format
+        run: terraform fmt -check
 
-  # 5. Terraform Init
-  - name: Terraform Init
-    id: init
-    run: terraform init
+      # 5. Terraform Init
+      - name: Terraform Init
+        run: terraform init
 
-  # 6. Terraform Validate
-  # Checks for syntax errors
-  - name: Terraform Validate
-    run: terraform validate
+      # 6. Terraform Validate
+      # Checks for syntax errors
+      - name: Terraform Validate
+        run: terraform validate
 
-  # --- NEW: SECURITY SCANNER (Checkov) ---
-  - name: Run Checkov Security Scan
-    id: checkov
-    if: github.event_name == 'pull_request'
-    uses: bridgecrewio/checkov-action@master
-    with:
-      directory: .
-      # soft_fail: true means it will warn but NOT block the build.
-      # Change to false if you want to fail the workflow on findings.
-      soft_fail: true
-      framework: terraform
+      # --- NEW: SECURITY SCANNER (Checkov) ---
+      - name: Run Checkov Security Scan
+        if: github.event_name == 'pull_request'
+        uses: bridgecrewio/checkov-action@master
+        with:
+          directory: .
+          # soft_fail: true means it will warn you but NOT block the build.
+          # Change to false if you want to force security fixes.
+          soft_fail: true 
+          framework: terraform
 
-  # 7. Terraform Plan (Runs ONLY on Pull Requests)
-  # Capture plan output into a step output so we can post it to the PR
-  - name: Terraform Plan
-    if: github.event_name == 'pull_request'
-    id: plan
-    run: |
-      # Save the plan output to a file and expose it as a step output
-      terraform plan -no-color -input=false | tee plan.txt
-      echo "stdout<<EOF" >> $GITHUB_OUTPUT
-      cat plan.txt >> $GITHUB_OUTPUT
-      echo "EOF" >> $GITHUB_OUTPUT
-    continue-on-error: true
+      # 7. Terraform Plan (Runs ONLY on Pull Requests)
+      - name: Terraform Plan
+        if: github.event_name == 'pull_request'
+        id: plan
+        # Generates a plan and saves it to a file, but doesn't apply it
+        run: terraform plan -no-color -input=false
+        continue-on-error: true # Let the workflow continue so we can comment the error if it fails
 
-  # 8. Post Plan to GitHub PR (GitOps Magic)
-  # This puts the plan results into the PR conversation
-  - name: Update Pull Request
-    uses: actions/github-script@v6
-    if: github.event_name == 'pull_request'
-    env:
-      PLAN: "terraform\n${{ steps.plan.outputs.stdout }}"
-    with:
-      github-token: ${{ secrets.GITHUB_TOKEN }}
-      script: |
-        const output = `#### Terraform Format and Style 🖌\`${{ steps.fmt.outcome }}\`
-        #### Terraform Initialization ⚙️\`${{ steps.init.outcome }}\`
-        #### Security Scan (Checkov) 🛡️\`${{ steps.checkov.outcome }}\`
-        #### Terraform Plan 📖\`${{ steps.plan.outcome }}\`
+      # 8. Post Plan to GitHub PR (GitOps Magic)
+      # This puts the plan results into the PR conversation
+      - name: Update Pull Request
+        uses: actions/github-script@v6
+        if: github.event_name == 'pull_request'
+        env:
+          PLAN: "terraform\n${{ steps.plan.outputs.stdout }}"
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const output = `#### Terraform Format and Style 🖌\`${{ steps.fmt.outcome }}\`
+            #### Terraform Initialization ⚙️\`${{ steps.init.outcome }}\`
+            #### Security Scan (Checkov) 🛡️\`${{ steps.plan.outcome }}\`
+            #### Terraform Plan 📖\`${{ steps.plan.outcome }}\`
 
-        <details><summary>Show Plan</summary>
+            <details><summary>Show Plan</summary>
 
-        \`\`\`\n
-        ${process.env.PLAN}
-        \`\`\`
+            \`\`\`\n
+            ${process.env.PLAN}
+            \`\`\`
 
-        </details>
+            </details>
 
-        *Pusher: @${{ github.actor }}, Action: \`${{ github.event_name }}\`*`;
+            *Pusher: @${{ github.actor }}, Action: \`${{ github.event_name }}\`*`;
 
-        github.rest.issues.createComment({
-          issue_number: context.issue.number,
-          owner: context.repo.owner,
-          repo: context.repo.repo,
-          body: output
-        })
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: output
+            })
 
-  # 9. Stop if Plan Failed
-  - name: Terraform Plan Status
-    if: steps.plan.outcome == 'failure'
-    run: exit 1
+      # 9. Stop if Plan Failed
+      - name: Terraform Plan Status
+        if: steps.plan.outcome == 'failure'
+        run: exit 1
 
-  # 10. Terraform Apply (Runs ONLY on Push to Main)
-  - name: Terraform Apply
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    run: terraform apply -auto-approve -input=false
+      # 10. Terraform Apply (Runs ONLY on Push to Main)
+      - name: Terraform Apply
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: terraform apply -auto-approve -input=false
