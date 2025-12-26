@@ -1,7 +1,15 @@
 name: Destroy Infrastructure
 
 on: 
-  workflow_dispatch: # This means "Only run when I click the button manually"
+  workflow_dispatch: # Manual trigger only
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: us-west-1
+  TF_VERSION: 1.5.0
 
 jobs:
   destroy:
@@ -10,15 +18,16 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v3
 
-      - name: Configure AWS Credentials
+      - name: Configure AWS Credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-1
+          role-to-assume: "${{ secrets.AWS_ROLE_ARN }}"
+          aws-region: ${{ env.AWS_REGION }}
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
 
       - name: Terraform Init
         run: terraform init
