@@ -142,3 +142,13 @@ resource "aws_ecs_service" "main" {
 
   depends_on = [aws_lb_listener.front_end]
 }
+
+# --- 7. Database Access Rule (The Missing Link) ---
+resource "aws_security_group_rule" "allow_db_access_from_ecs" {
+  type                     = "ingress"
+  from_port                = 3306
+  to_port                  = 3306
+  protocol                 = "tcp"
+  source_security_group_id = aws_security_group.ecs_tasks_sg.id
+  security_group_id        = module.security_groups.db_sg_id
+}
