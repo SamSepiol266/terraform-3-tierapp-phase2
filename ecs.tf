@@ -111,12 +111,11 @@ resource "aws_ecs_task_definition" "app" {
       containerPort = 80
       hostPort      = 80
     }]
-    # --- ENVIRONMENT VARIABLES (Connecting to DB) ---
     environment = [
       { name = "DB_HOST", value = split(":", module.database_tier.db_instance_endpoint)[0] },
-      { name = "DB_NAME", value = "mydb" }, # Update if you named your DB differently
-      { name = "DB_USER", value = "admin" }, # Default for RDS usually
-      { name = "DB_PASSWORD", value = "YourSecurePassword123" } # Matching your main.tf
+      { name = "DB_NAME", value = "mydb" },
+      { name = "DB_USER", value = "admin" },
+      { name = "DB_PASSWORD", value = "YourSecurePassword123" }
     ]
   }])
 }
